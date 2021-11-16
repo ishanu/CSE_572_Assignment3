@@ -4,46 +4,35 @@ import math
 import datetime
 from sklearn.cluster import KMeans
 from sklearn.cluster import DBSCAN
-from sklearn.preprocessing import normalize
-
-
-# Please run this program on the data given in the second assignment ie files: 'CGMData670GPatient3.xlsx', 'InsulinAndMealIntake670GPatient3.xlsx'
 from feature import getFeatures
 
 
-def get_CGM_Insulin_DF(CGM_file, Insulin_file, isCSVdata):
-    # load the CGM data
+def getCgmInsulinValues():
 
-    CGMData_DF = pd.read_csv(CGM_file, usecols=["Date", "Time", "Sensor Glucose (mg/dL)"])
+    CGMDataDf = pd.read_csv('CGMData.csv', usecols=["Date", "Time", "Sensor Glucose (mg/dL)"])
 
-
-    # datetime formatting
-    CGMData_DF["Date"] = CGMData_DF["Date"].astype(str)
-    CGMData_DF["Time"] = CGMData_DF["Time"].astype(str)
-    CGMData_DF["DateTime"] = CGMData_DF["Date"] + " " + CGMData_DF["Time"]
-    CGMData_DF.drop(columns=["Date", "Time"], inplace=True)
-    CGMData_DF["DateTime"] = pd.to_datetime(CGMData_DF["DateTime"])
+    CGMDataDf["Date"] = CGMDataDf["Date"].astype(str)
+    CGMDataDf["Time"] = CGMDataDf["Time"].astype(str)
+    CGMDataDf["DateTime"] = CGMDataDf["Date"] + " " + CGMDataDf["Time"]
+    CGMDataDf.drop(columns=["Date", "Time"], inplace=True)
+    CGMDataDf["DateTime"] = pd.to_datetime(CGMDataDf["DateTime"])
 
     # load the Insulin data
 
-    InsulinData_DF = pd.read_csv(Insulin_file, usecols=["Date", "Time", "BWZ Carb Input (grams)"])
-
+    InsulinDataDf = pd.read_csv('InsulinData.csv', usecols=["Date", "Time", "BWZ Carb Input (grams)"])
 
     # datetime formatting
-    InsulinData_DF["Date"] = InsulinData_DF["Date"].astype(str)
-    InsulinData_DF["Time"] = InsulinData_DF["Time"].astype(str)
-    InsulinData_DF["DateTime"] = InsulinData_DF["Date"] + " " + InsulinData_DF["Time"]
-    InsulinData_DF.drop(columns=["Date", "Time"], inplace=True)
-    InsulinData_DF["DateTime"] = pd.to_datetime(InsulinData_DF["DateTime"])
+    InsulinDataDf["Date"] = InsulinDataDf["Date"].astype(str)
+    InsulinDataDf["Time"] = InsulinDataDf["Time"].astype(str)
+    InsulinDataDf["DateTime"] = InsulinDataDf["Date"] + " " + InsulinDataDf["Time"]
+    InsulinDataDf.drop(columns=["Date", "Time"], inplace=True)
+    InsulinDataDf["DateTime"] = pd.to_datetime(InsulinDataDf["DateTime"])
 
-    return CGMData_DF, InsulinData_DF
-
-
-#CGMData_P1_DF, InsulinData_P1_DF = get_CGM_Insulin_DF('CGMData670GPatient3.xlsx','InsulinAndMealIntake670GPatient3.xlsx', False)
+    return CGMDataDf, InsulinDataDf
 
 
-# CGMData_P2_DF, InsulinData_P2_DF = get_CGM_Insulin_DF('CGMData.csv', 'InsulinData.csv', True)
-CGMData_P1_DF, InsulinData_P1_DF = get_CGM_Insulin_DF('CGMData.csv', 'InsulinData.csv', True)
+CGMDataDf, InsulinDf = getCgmInsulinValues()
+
 
 def decide_bin(x, vmin, total_bins):
     a = float((x - vmin) / 20)
@@ -53,20 +42,20 @@ def decide_bin(x, vmin, total_bins):
     return f
 
 
-def get_all_meal_DF(InsulinData_DF):
+def getMeals(InsulinDataDF):
     # get date time of all meals intake
-    filt = InsulinData_DF['BWZ Carb Input (grams)'].notnull() & InsulinData_DF['BWZ Carb Input (grams)'] != 0
-    Insulin_all_meal_DF = InsulinData_DF.loc[filt][["DateTime", 'BWZ Carb Input (grams)']]
-    Insulin_all_meal_DF = Insulin_all_meal_DF.sort_values(by="DateTime")
-    minCarbInput = Insulin_all_meal_DF["BWZ Carb Input (grams)"].min()
-    maxCarbInput = Insulin_all_meal_DF["BWZ Carb Input (grams)"].max()
-    total_bins = math.ceil((maxCarbInput - minCarbInput) / 20)
-    Insulin_all_meal_DF["bin"] = Insulin_all_meal_DF["BWZ Carb Input (grams)"].apply(
-        lambda x: decide_bin(x, minCarbInput, total_bins))
-    return Insulin_all_meal_DF, total_bins
+    filt = InsulinDataDF['BWZ Carb Input (grams)'].notnull() & InsulinDataDF['BWZ Carb Input (grams)'] != 0
+    InsulinmealDf = InsulinDataDF.loc[filt][["DateTime", 'BWZ Carb Input (grams)']]
+    InsulinmealDf = InsulinmealDf.sort_values(by="DateTime")
+    minCarbInput = InsulinmealDf["BWZ Carb Input (grams)"].min()
+    maxCarbInput = InsulinmealDf["BWZ Carb Input (grams)"].max()
+    bins = math.ceil((maxCarbInput - minCarbInput) / 20)
+    InsulinmealDf["bin"] = InsulinmealDf["BWZ Carb Input (grams)"].apply(
+        lambda x: decide_bin(x, minCarbInput, bins))
+    return InsulinmealDf, bins
 
 
-InsulinData_P1_all_meal_DF, N_P1 = get_all_meal_DF(InsulinData_P1_DF)
+InsulinMealDf, nP1 = getMeals(InsulinDf)
 
 
 def filter_meals(Insulin_all_meal_DF):
@@ -84,7 +73,7 @@ def filter_meals(Insulin_all_meal_DF):
     return Insulin_meal_DF
 
 
-InsulinData_P1_meal_DF = filter_meals(InsulinData_P1_all_meal_DF)
+InsulinData_P1_meal_DF = filter_meals(InsulinMealDf)
 
 
 def extract_meal_CGM_data(Insulin_meal_DF, CGMData_DF):
@@ -112,7 +101,7 @@ def extract_meal_CGM_data(Insulin_meal_DF, CGMData_DF):
     return mealData_DF, np.array(mealData_bins)
 
 
-mealData_P1_DF, mealData_P1_bins = extract_meal_CGM_data(InsulinData_P1_meal_DF, CGMData_P1_DF)
+mealData_P1_DF, mealData_P1_bins = extract_meal_CGM_data(InsulinData_P1_meal_DF, CGMDataDf)
 
 
 # visualization
@@ -130,10 +119,11 @@ mealData_ext_P1_DF = extract_data(mealData_P1_DF)
 mealData_ext_P1_NP = mealData_ext_P1_DF.to_numpy()
 
 # kmeans
-kmeans_P1 = KMeans(n_clusters=int(N_P1), random_state=0).fit(mealData_ext_P1_NP)
+kmeans_P1 = KMeans(n_clusters=int(nP1), random_state=0).fit(mealData_ext_P1_NP)
 
 # dbscan
 dbscan_P1 = DBSCAN(eps=50, min_samples=5, p=2).fit(mealData_ext_P1_NP)
+
 
 def get_dbscan_means(labels, data):
     means_dbscan = []
@@ -227,8 +217,8 @@ def combine_dbscan_labels(labels, bins, data):
 dbscan_labels_P1 = np.copy(dbscan_P1.labels_)
 dbscan_labels_P1 = change_minus_ones(dbscan_labels_P1, mealData_ext_P1_NP,
                                      get_dbscan_means(dbscan_labels_P1, mealData_ext_P1_NP))
-dbscan_labels_P1 = divide_dbscan_labels(dbscan_labels_P1, N_P1, mealData_ext_P1_NP)
-dbscan_labels_P1 = combine_dbscan_labels(dbscan_labels_P1, N_P1, mealData_ext_P1_NP)
+dbscan_labels_P1 = divide_dbscan_labels(dbscan_labels_P1, nP1, mealData_ext_P1_NP)
+dbscan_labels_P1 = combine_dbscan_labels(dbscan_labels_P1, nP1, mealData_ext_P1_NP)
 
 # kmeans sse
 sse_kmeans_P1 = kmeans_P1.inertia_
@@ -247,8 +237,8 @@ def make_gtt(gtlabels, labels, total_bins):
     return gtt
 
 
-gtt_kmeans_P1 = make_gtt(mealData_P1_bins, kmeans_P1.labels_, int(N_P1))
-gtt_dbscan_P1 = make_gtt(mealData_P1_bins, dbscan_labels_P1, int(N_P1))
+gtt_kmeans_P1 = make_gtt(mealData_P1_bins, kmeans_P1.labels_, int(nP1))
+gtt_dbscan_P1 = make_gtt(mealData_P1_bins, dbscan_labels_P1, int(nP1))
 
 
 # cal entropy
@@ -294,7 +284,7 @@ purity_kmeans_P1 = cal_purity(gtt_kmeans_P1)
 purity_dbscan_P1 = cal_purity(gtt_dbscan_P1)
 
 # print the result: kmeans sse, dbscan sse, kmeans entropy, dbscan entropy, kmeans purity, dbscan purity
-#print(f'{sse_kmeans_P1} {sse_dbscan_P1} {entropy_kmeans_P1} {entropy_dbscan_P1} {purity_kmeans_P1} {purity_dbscan_P1}')
+# print(f'{sse_kmeans_P1} {sse_dbscan_P1} {entropy_kmeans_P1} {entropy_dbscan_P1} {purity_kmeans_P1} {purity_dbscan_P1}')
 
 # save the results in a file
 results = np.array(
