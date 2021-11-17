@@ -8,7 +8,6 @@ from feature import getFeatures
 
 
 def getCgmInsulinValues():
-
     CGMDataDf = pd.read_csv('CGMData.csv', usecols=["Date", "Time", "Sensor Glucose (mg/dL)"])
 
     CGMDataDf["Date"] = CGMDataDf["Date"].astype(str)
@@ -58,56 +57,54 @@ def getMeals(InsulinDataDF):
 InsulinMealDf, nP1 = getMeals(InsulinDf)
 
 
-def filter_meals(Insulin_all_meal_DF):
+def getMeals(InsulinMeals):
     # filter meal times by checking if another meal is not happening within 2hrs
     filt = []
     mintd = 2 * 60 * 60
-    for i in range(len(Insulin_all_meal_DF) - 1):
-        td = Insulin_all_meal_DF.iloc[i + 1]["DateTime"] - Insulin_all_meal_DF.iloc[i]["DateTime"]
+    for i in range(len(InsulinMeals) - 1):
+        td = InsulinMeals.iloc[i + 1]["DateTime"] - InsulinMeals.iloc[i]["DateTime"]
         if td.total_seconds() <= mintd:
             filt.append(False)
         else:
             filt.append(True)
     filt.append(True)
-    Insulin_meal_DF = Insulin_all_meal_DF[filt]
-    return Insulin_meal_DF
+    InsulinMealDF = InsulinMeals[filt]
+    return InsulinMealDF
 
 
-InsulinData_P1_meal_DF = filter_meals(InsulinMealDf)
+InsulinMealDF = getMeals(InsulinMealDf)
 
 
-def extract_meal_CGM_data(Insulin_meal_DF, CGMData_DF):
+def extractCgmData(InsulinMealDF, CGMDataDf):
     # extracting meal data from CGM data
-    thirtymins = 30 * 60
-    twohrs = 2 * 60 * 60
-    colnames = list(range(1, 31))
-    mealData_DF = pd.DataFrame()
-    mealData_bins = []
-    for i in range(len(Insulin_meal_DF)):
-        lb = Insulin_meal_DF.iloc[i]["DateTime"] - datetime.timedelta(seconds=thirtymins)
-        ub = Insulin_meal_DF.iloc[i]["DateTime"] + datetime.timedelta(seconds=twohrs)
-        meal_bin = Insulin_meal_DF.iloc[i]["bin"]
-        filt = (CGMData_DF["DateTime"] >= lb) & (CGMData_DF["DateTime"] < ub)
-        filCGMData_DF = CGMData_DF[filt]
-        if len(filCGMData_DF.index) == 30 and filCGMData_DF.isnull().values.any() == False:
-            filCGMData_DF = filCGMData_DF.sort_values(by="DateTime")
-            filCGMData_DF = filCGMData_DF.T
-            filCGMData_DF.drop('DateTime', inplace=True)
-            filCGMData_DF.reset_index(drop=True, inplace=True)
-            filCGMData_DF.columns = colnames
-            mealData_DF = mealData_DF.append(filCGMData_DF, ignore_index=True)
-            mealData_bins.append(meal_bin)
-    mealData_DF = mealData_DF.apply(pd.to_numeric)
-    return mealData_DF, np.array(mealData_bins)
+    columnnames = list(range(1, 31))
+    mealData = pd.DataFrame()
+    mealDataBins = []
+    for i in range(len(InsulinMealDF)):
+        lb = InsulinMealDF.iloc[i]["DateTime"] - datetime.timedelta(seconds=1800)
+        ub = InsulinMealDF.iloc[i]["DateTime"] + datetime.timedelta(seconds=7200)
+        meal_bin = InsulinMealDF.iloc[i]["bin"]
+        filt = (CGMDataDf["DateTime"] >= lb) & (CGMDataDf["DateTime"] < ub)
+        fillCgmData = CGMDataDf[filt]
+        if len(fillCgmData.index) == 30 and fillCgmData.isnull().values.any() == False:
+            fillCgmData = fillCgmData.sort_values(by="DateTime")
+            fillCgmData = fillCgmData.T
+            fillCgmData.drop('DateTime', inplace=True)
+            fillCgmData.reset_index(drop=True, inplace=True)
+            fillCgmData.columns = columnnames
+            mealData = mealData.append(fillCgmData, ignore_index=True)
+            mealDataBins.append(meal_bin)
+    mealData = mealData.apply(pd.to_numeric)
+    return mealData, np.array(mealDataBins)
 
 
-mealData_P1_DF, mealData_P1_bins = extract_meal_CGM_data(InsulinData_P1_meal_DF, CGMDataDf)
+mealDataClusterDf, mealDataBins = extractCgmData(InsulinMealDF, CGMDataDf)
 
 
 # visualization
 # filCGMData_DF.plot(x="DateTime",y="Sensor Glucose (mg/dL)")
-# mealData_P1_DF.plot()
-# mealData_P1_DF.loc[0].plot()
+# mealDataClusterDf.plot()
+# mealDataClusterDf.loc[0].plot()
 # plt.show()
 
 def extract_data(inp_DF):
@@ -115,7 +112,7 @@ def extract_data(inp_DF):
     return out_DF
 
 
-mealData_ext_P1_DF = extract_data(mealData_P1_DF)
+mealData_ext_P1_DF = extract_data(mealDataClusterDf)
 mealData_ext_P1_NP = mealData_ext_P1_DF.to_numpy()
 
 # kmeans
@@ -237,8 +234,8 @@ def make_gtt(gtlabels, labels, total_bins):
     return gtt
 
 
-gtt_kmeans_P1 = make_gtt(mealData_P1_bins, kmeans_P1.labels_, int(nP1))
-gtt_dbscan_P1 = make_gtt(mealData_P1_bins, dbscan_labels_P1, int(nP1))
+gtt_kmeans_P1 = make_gtt(mealDataBins, kmeans_P1.labels_, int(nP1))
+gtt_dbscan_P1 = make_gtt(mealDataBins, dbscan_labels_P1, int(nP1))
 
 
 # cal entropy
